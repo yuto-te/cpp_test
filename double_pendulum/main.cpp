@@ -4,9 +4,10 @@ RK4
 */
 
 #include<iostream>
-#include <cmath>
+#include<cmath>
+#include<fstream>
 
-#include "Eigen/Core"
+#include<Eigen/Core>
 
 // 重力加速度
 constexpr double g = 9.80665;
@@ -73,6 +74,10 @@ int main()
     Eigen::Matrix<double, 4, 1> x = initialCondition();
     Eigen::Matrix<double, 4, 1> k1, k2, k3, k4;
     double t = 0., KE, PE;
+
+    std::fstream data;
+    data.open("data.csv", std::ios::out);
+
     FILE *gp = popen("gnuplot","w");
     fprintf(gp, "set nokey\n");
     fprintf(gp, "set size square\n");
@@ -82,18 +87,21 @@ int main()
     fprintf(gp, "set yr [%f:%f]\n", -l1 - l2, l1 + l2);
 
     for(std::size_t i {}; t < tlim; ++i){
-        // KE = kineticEnergy(x);
-        // PE = potentialEnergy(x);
-        // std::cout << i*dt << " " << KE + PE << std::endl; // エネルギーが保存されているか確認
+        KE = kineticEnergy(x);
+        PE = potentialEnergy(x);
+        std::cout << i*dt << " " << KE + PE << std::endl; // エネルギーが保存されているか確認
 
-        // gnuplot
-        fprintf(gp, "plot '-' w lp lw 3\n");
-        fprintf(gp, "0.0 0.0\n");
-        fprintf(gp, "%f %f\n", l1*sin(x(0,0)), -l1*cos(x(0,0)));
-        fprintf(gp, "%f %f\n", l1*sin(x(0,0)) + l2*sin(x(1,0)), -l1*cos(x(0,0)) - l2*cos(x(1,0)));
-        fprintf(gp, "e\n");
-        // fprintf(gp, "set output\n");
-        // fflush(gp);
+        if (i%10==0){
+            // gnuplot
+            fprintf(gp, "plot '-' w lp lw 3\n");
+            fprintf(gp, "0.0 0.0\n");
+            fprintf(gp, "%f %f\n", l1*sin(x(0,0)), -l1*cos(x(0,0)));
+            fprintf(gp, "%f %f\n", l1*sin(x(0,0)) + l2*sin(x(1,0)), -l1*cos(x(0,0)) - l2*cos(x(1,0)));
+            fprintf(gp, "e\n");
+        }
+
+        // csv
+        data << x(0,0) << "," << x(1,0) << "," << x(2,0) << "," << x(3,0) << std::endl;
 
         // RK4
         k1 = updateCondition(x);
@@ -107,4 +115,5 @@ int main()
     // fprintf(gp, "set out\n");
     // fprintf(gp, "set terminal wxt enhanced\n");
     pclose(gp);
+    data.close();
 }
