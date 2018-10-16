@@ -6,6 +6,9 @@
 
 #include <iostream>
 #include <array>
+#include <fstream>
+#include <sstream>
+#include <string>
 #include <unistd.h>     // sleep
 #include <vector>
 
@@ -17,6 +20,7 @@ private:
     int turn, not_turn;
     bool pass1, pass2;
     std::vector< std::vector<int> > you_can_put;
+    std::string filename;
     int check(const int x, const int y, const int p, const int q);
     bool check_around(const int x, const int y);
     void turn_over(const int x, const int y, const int p, const int q, const int reverse);
@@ -24,6 +28,7 @@ public:
     Othello();
     void update(const int x, const int y);
     void print();
+    void write_file();
     void search();
     bool pass_check();
     std::array<int, 2> next_stone();
@@ -35,6 +40,7 @@ Othello::Othello()
     , not_turn(2)
     , pass1(false)
     , pass2(false)
+
 {
     for(int x = 0; x < L; x++){
         for(int y = 0; y < L; y++){
@@ -43,6 +49,15 @@ Othello::Othello()
     }
     board[4][4] = board[5][5] = 1;
     board[5][4] = board[4][5] = 2;
+    time_t t = time(nullptr);
+    const tm* now_time = localtime(&t);
+    std::stringstream s;
+    s<<"20";
+    s<<now_time->tm_year-100 <<now_time->tm_mon+1 <<now_time->tm_mday << now_time->tm_hour << now_time->tm_min << now_time->tm_sec << ".dat";
+    filename = s.str();
+    std::ofstream writing_file;
+    writing_file.open(filename, std::ios::out);
+    writing_file.close();
     // board[2][6] = board[2][7] = board[2][8] = board[3][5] = board[3][7] = board[5][3] = board[5][4] = board[5][5] = 1;
     // board[1][6] = board[1][7] = board[1][8] = board[3][6] = board[3][8] = board[4][3] = board[4][4] = board[4][5] = board[4][6] = board[5][6] = 2;
 }
@@ -174,6 +189,38 @@ void Othello::print(){
 }
 
 /**
+ * @brief 途中経過をファイルに保存する
+ */
+void Othello::write_file(){
+    std::ofstream writing_file;
+    writing_file.open(filename, std::ios::app);
+    writing_file << "  A B C D E F G H" << std::endl;
+    int black = 0;
+    int white = 0;
+    for(int x = 1; x < L - 1; x++){
+        writing_file << x;
+        for(int y = 1; y < L - 1; y++){
+            if(board[x][y] == 1){
+                writing_file << " ○";
+                black++;
+            }
+            else if(board[x][y] == 2){
+                writing_file << " ●";
+                white++;
+            }
+            else if(if_put(x, y, you_can_put)){
+                writing_file << " _";
+            }
+            else writing_file << " .";
+        }
+        writing_file << std::endl;
+    }
+    writing_file << "黒 " << black << "   " << "白 " << white << std::endl;
+    writing_file << std::endl;
+    writing_file.close();
+}
+
+/**
  * @brief アルファベットを数値に変換する. A-H -> 0-7
  * @param[in] c alphabet character
  */
@@ -207,11 +254,15 @@ int main(){
         if(game.pass_check()){
             game.search();
             game.print();
+            game.write_file();
             std::cout << "pass" << std::endl;
             sleep(1);
             continue;
         }
-        else game.print();
+        else{
+            game.print();
+            game.write_file();
+        }
         if(game.end_of_game()) break;
         pair = game.next_stone();
         game.update(pair[0], pair[1]);
