@@ -6,21 +6,20 @@
 
 #include <iostream>
 #include <array>
-#include <fstream>
-#include <sstream>
-#include <string>
+#include <fstream>      // ofstream
+#include <sstream>      // stringstream
 #include <unistd.h>     // sleep
 #include <vector>
 
-constexpr int L = 10; // オセロの格子のサイズ
+constexpr int L = 10; // オセロの格子のサイズ，境界用に一回り大きくとっている
 
 class Othello{
 private:
     std::array< std::array<int, L>, L > board;
-    int turn, not_turn;
-    bool pass1, pass2;
-    std::vector< std::vector<int> > you_can_put;
-    std::string filename;
+    int turn, not_turn; // 手番の色を管理
+    bool pass1, pass2; // 連続するパスの管理
+    std::vector< std::vector<int> > list_can_put; // 石を置ける座標のリスト
+    std::string filename; // 出力ファイル名
     int check(const int x, const int y, const int p, const int q);
     bool check_around(const int x, const int y);
     void turn_over(const int x, const int y, const int p, const int q, const int reverse);
@@ -36,11 +35,10 @@ public:
 };
 
 Othello::Othello()
-    : turn(1)
-    , not_turn(2)
+    : turn(1) // 黒が先攻
+    , not_turn(2) // 白が後攻
     , pass1(false)
     , pass2(false)
-
 {
     for(int x = 0; x < L; x++){
         for(int y = 0; y < L; y++){
@@ -49,17 +47,14 @@ Othello::Othello()
     }
     board[4][4] = board[5][5] = 1;
     board[5][4] = board[4][5] = 2;
+
+    // 現在時刻をファイル名としてログをとる
     time_t t = time(nullptr);
     const tm* now_time = localtime(&t);
     std::stringstream s;
     s<<"20";
     s<<now_time->tm_year-100 <<now_time->tm_mon+1 <<now_time->tm_mday << now_time->tm_hour << now_time->tm_min << now_time->tm_sec << ".dat";
     filename = s.str();
-    std::ofstream writing_file;
-    writing_file.open(filename, std::ios::out);
-    writing_file.close();
-    // board[2][6] = board[2][7] = board[2][8] = board[3][5] = board[3][7] = board[5][3] = board[5][4] = board[5][5] = 1;
-    // board[1][6] = board[1][7] = board[1][8] = board[3][6] = board[3][8] = board[4][3] = board[4][4] = board[4][5] = board[4][6] = board[5][6] = 2;
 }
 
 /**
@@ -96,6 +91,9 @@ void Othello::turn_over(const int x, const int y, const int p, const int q, cons
     }
 }
 
+/**
+ * @brief ひっくり返る医師の個数を調べて，ひっくり返す
+ */
 void Othello::update(const int x, const int y){
     std::array<int, 3> a = {-1, 0, 1};
     for(int i = 0; i < 3; i++){
@@ -109,7 +107,7 @@ void Othello::update(const int x, const int y){
 }
 
 /**
- * @brief 周囲8方向でひっくり返すことのできる石の個数を返す
+ * @brief 周囲8方向でひっくり返すことのできる石の個数の合計を求めて，0でないか調べる
  */
 bool Othello::check_around(const int x, const int y){
     std::array<int, 3> a = {-1, 0, 1};
@@ -124,38 +122,48 @@ bool Othello::check_around(const int x, const int y){
     else return true;
 }
 
+/**
+ * @brief 石のおける場所のリストを返す
+ */
 void Othello::search(){
     std::vector< std::vector<int> > can_put;
-    for(int x = 0; x < L; x++){
-        for(int y = 0; y < L; y++){
+    for(int x = 1; x < L - 1; x++){
+        for(int y = 1; y < L - 1; y++){
             if(board[x][y] == 0){
                 if(check_around(x, y)) can_put.push_back({x, y});
             }
         }
     }
-    you_can_put = can_put;
-}
-
+    list_can_put = can_put; // 石を置ける座標のリスト
+} // 出力ファイル名
+/**
+ * @brief 打てる場所がなければパスする，パスが連続で続くかも判定する
+ */
 bool Othello::pass_check(){
-    if(you_can_put.size() == 0){
-        std::swap(turn, not_turn);
+    if(list_can_put.size() == 0){ // 石を置ける座標のリスト
+        std::swap(turn, not_turn); // 出力ファイル名
         if(pass1) pass2 = true;
         else pass1 = true;
-        if(pass1 && pass2) return false;
-        else return true;
+        return true;
     }
     else return false;
 }
 
+/**
+ * @brief パスが連続したら(連続でお互いにパスしたら)ゲーム終了
+ */
 bool Othello::end_of_game(){
     if(pass1 && pass2) return true;
     else return false;
 }
 
+/**
+ * @brief 入力した座標に石を置けるか判定する
+ */
 bool if_put(const int x, const int y, const std::vector< std::vector<int> > &can_put){
     bool flag = false;
-    for(auto&& pair : can_put){
-        if(x == pair[0] && y == pair[1]){
+    for(auto&& coordinate : can_put){
+        if(x == coordinate[0] && y == coordinate[1]){
             flag = true;
             break;
         }
@@ -163,6 +171,9 @@ bool if_put(const int x, const int y, const std::vector< std::vector<int> > &can
     return flag;
 }
 
+/**
+ * @brief 盤面を出力する
+ */
 void Othello::print(){
     std::cout << " ＡＢＣＤＥＦＧＨ" << std::endl;
     int black = 0;
@@ -178,8 +189,8 @@ void Othello::print(){
                 std::cout << "●";
                 white++;
             }
-            else if(if_put(x, y, you_can_put)){
-                std::cout << "　";
+            else if(if_put(x, y, list_can_put)){ // 石を置ける座標のリスト
+                std::cout << "　"; // 出力ファイル名
             }
             else std::cout << "・";
         }
@@ -201,15 +212,15 @@ void Othello::write_file(){
         writing_file << x;
         for(int y = 1; y < L - 1; y++){
             if(board[x][y] == 1){
-                writing_file << " ○";
+                writing_file << " o";
                 black++;
             }
             else if(board[x][y] == 2){
-                writing_file << " ●";
+                writing_file << " #";
                 white++;
             }
-            else if(if_put(x, y, you_can_put)){
-                writing_file << " _";
+            else if(if_put(x, y, list_can_put)){ // 石を置ける座標のリスト
+                writing_file << "  "; // 出力ファイル名
             }
             else writing_file << " .";
         }
@@ -230,6 +241,9 @@ int alphabetToNumber(const char c){
     return -1;
 }
 
+/**
+ * @brief 次に石を置く場所を入力する
+ */
 std::array<int, 2> Othello::next_stone(){
     char c;
     int x, y;
@@ -239,19 +253,21 @@ std::array<int, 2> Othello::next_stone(){
         else std::cout << "白";
         std::cin >> x >> c;
         y = alphabetToNumber(c);
-        if(if_put(x, y, you_can_put)) break;
-        std::cout << "wrong place, again" << std::endl;
+        if(if_put(x, y, list_can_put)) break; // 石を置ける座標のリスト
+        std::cout << "wrong place, again" << std::endl; // 出力ファイル名
     }
     return {x, y};
 }
 
 int main(){
     Othello game;
-    std::array<int, 2> pair;
+    std::array<int, 2> coordinate;
     while(true){
+        if(game.end_of_game()) break;
         std::system("clear");
         game.search();
         if(game.pass_check()){
+            // 手番交代
             game.search();
             game.print();
             game.write_file();
@@ -262,10 +278,9 @@ int main(){
         else{
             game.print();
             game.write_file();
+            coordinate = game.next_stone();
+            game.update(coordinate[0], coordinate[1]);
         }
-        if(game.end_of_game()) break;
-        pair = game.next_stone();
-        game.update(pair[0], pair[1]);
     }
     std::cout << "end game" << std::endl;
     return 0;
